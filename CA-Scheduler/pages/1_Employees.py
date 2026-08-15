@@ -163,7 +163,7 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
     return edited
 
 
-st.title("👥 員工管理_T")
+st.title("👥 員工管理")
 st.markdown("---")
 
 tab_list, tab_add, tab_edit = st.tabs(["📋 員工列表", "➕ 新增員工", "✏️ 編輯 / 刪除員工"])
