@@ -16,8 +16,19 @@ if _TURSO_URL and _TURSO_TOKEN:
     # Turso 雲端生產環境（Streamlit Cloud 使用）
     import turso_serverless
 
+    class _TursoConn:
+        """Wrap turso_serverless connection to stub out SQLite-only methods."""
+        def __init__(self, conn):
+            self._conn = conn
+
+        def create_function(self, *args, **kwargs):
+            pass  # turso_serverless 不支援，忽略即可
+
+        def __getattr__(self, name):
+            return getattr(self._conn, name)
+
     def _creator():
-        return turso_serverless.connect(_TURSO_URL, auth_token=_TURSO_TOKEN)
+        return _TursoConn(turso_serverless.connect(_TURSO_URL, auth_token=_TURSO_TOKEN))
 
     engine = create_engine(
         "sqlite://",       # 用 SQLite 語法生成 SQL
