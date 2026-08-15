@@ -155,7 +155,7 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
     edited = st.data_editor(
         st.session_state[state_key],
         column_config=col_cfg,
-        use_container_width=True,
+        width="stretch",
         height=520,
     )
     # Persist manual edits back to session state for next rerun
@@ -194,7 +194,7 @@ with tab_list:
                 for e in employees
             ]
         )
-        st.dataframe(df_list, use_container_width=True, hide_index=True)
+        st.dataframe(df_list, width="stretch", hide_index=True)
 
         st.markdown("---")
         st.subheader("員工可排班時段預覽")
@@ -214,7 +214,7 @@ with tab_list:
 
         st.dataframe(
             prev_df.map(lambda x: "✅" if x else ""),
-            use_container_width=True,
+            width="stretch",
             height=380,
         )
 

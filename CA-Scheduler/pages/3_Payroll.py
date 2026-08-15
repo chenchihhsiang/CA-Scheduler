@@ -102,7 +102,7 @@ for r in results:
 total_row["📊 當日合計"] = f"${total_labor:,.2f}"
 daily_cost_rows.append(total_row)
 
-st.dataframe(pd.DataFrame(daily_cost_rows), use_container_width=True, hide_index=True)
+st.dataframe(pd.DataFrame(daily_cost_rows), width="stretch", hide_index=True)
 
 st.markdown("---")
 
@@ -128,7 +128,7 @@ for r in results:
 
 st.dataframe(
     pd.DataFrame(summary_rows),
-    use_container_width=True,
+    width="stretch",
     hide_index=True,
 )
 
@@ -208,7 +208,7 @@ for r in results:
 
         st.dataframe(
             pd.DataFrame(daily_rows),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 

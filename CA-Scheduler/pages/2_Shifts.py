@@ -205,7 +205,7 @@ cal_df = pd.DataFrame(cal).T  # employees as rows
 cal_df.index.name = "員工"
 cal_df.columns = col_headers
 cal_df = cal_df.replace("", "—")
-st.dataframe(cal_df, use_container_width=True)
+st.dataframe(cal_df, width="stretch")
 
 # ── Weekly hours summary ──────────────────────────────────────────────────────
 st.markdown("### 📊 本週工時總覽")
@@ -303,7 +303,7 @@ with st.expander("📂 複製上週班表到本週", expanded=False):
                 "下班": _cs.end_time.strftime("%H:%M"),
                 "工時": f"{calc_hours(_cs.start_time, _cs.end_time, _cs.break_minutes):.1f} h",
             })
-        st.dataframe(pd.DataFrame(_copy_preview), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(_copy_preview), width="stretch", hide_index=True)
 
         _cdb2 = get_db()
         try:
