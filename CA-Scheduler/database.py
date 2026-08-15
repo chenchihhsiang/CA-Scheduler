@@ -6,7 +6,7 @@ except ImportError:
     pass
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import StaticPool, NullPool
 from models import Base
 
 _TURSO_URL = os.getenv("TURSO_DATABASE_URL")
@@ -33,7 +33,7 @@ if _TURSO_URL and _TURSO_TOKEN:
     engine = create_engine(
         "sqlite://",       # 用 SQLite 語法生成 SQL
         creator=_creator,  # 實際連線由 turso_serverless 提供
-        poolclass=StaticPool,
+        poolclass=NullPool,  # 每次請求建立新連線，避免 Turso HTTP stream 過期
     )
 else:
     # 本地開發環境 - SQLite
