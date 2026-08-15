@@ -6,25 +6,29 @@ except ImportError:
     pass
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from models import Base
 
-# 支持 Turso（生產）和本地 SQLite（開發）
-_DATABASE_URL = os.getenv("DATABASE_URL")
+_TURSO_URL = os.getenv("TURSO_DATABASE_URL")
+_TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
-if _DATABASE_URL:
-    # Turso 生產環境
-    if _DATABASE_URL.startswith("libsql://"):
-        # Turso 遠程資料庫
-        engine = create_engine(_DATABASE_URL, echo=False)
-    else:
-        # 其他 SQL 方言
-        engine = create_engine(_DATABASE_URL, echo=False)
+if _TURSO_URL and _TURSO_TOKEN:
+    # Turso 雲端生產環境（Streamlit Cloud 使用）
+    import turso_serverless
+
+    def _creator():
+        return turso_serverless.connect(_TURSO_URL, auth_token=_TURSO_TOKEN)
+
+    engine = create_engine(
+        "sqlite://",       # 用 SQLite 語法生成 SQL
+        creator=_creator,  # 實際連線由 turso_serverless 提供
+        poolclass=StaticPool,
+    )
 else:
     # 本地開發環境 - SQLite
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    _LOCAL_DB = f"sqlite:///{os.path.join(_BASE_DIR, 'ca_scheduler.db')}"
     engine = create_engine(
-        _LOCAL_DB,
+        f"sqlite:///{os.path.join(_BASE_DIR, 'ca_scheduler.db')}",
         connect_args={"check_same_thread": False},
     )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
