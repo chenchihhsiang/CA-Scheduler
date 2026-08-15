@@ -213,7 +213,7 @@ with tab_list:
             summary_cols[i].metric(day, f"{count} 格", f"{count * 0.5:.1f} h")
 
         st.dataframe(
-            prev_df.replace({True: "✅", False: ""}),
+            prev_df.map(lambda x: "✅" if x else ""),
             use_container_width=True,
             height=380,
         )
