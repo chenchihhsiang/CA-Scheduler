@@ -47,12 +47,37 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db() -> None:
     """Create all tables if they do not exist yet, then apply migrations."""
-    Base.metadata.create_all(bind=engine)
-    _migrate()
+    if _TURSO_URL and _TURSO_TOKEN:
+        # Turso 不支援 PRAGMA，改用原生 SQL 建表
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS employees (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    position TEXT,
+                    hourly_rate REAL NOT NULL DEFAULT 16.0,
+                    target_hours REAL DEFAULT 40.0,
+                    availability TEXT DEFAULT '{}'
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS shifts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_id INTEGER NOT NULL REFERENCES employees(id),
+                    date TEXT NOT NULL,
+                    start_time TEXT NOT NULL,
+                    end_time TEXT NOT NULL,
+                    break_minutes INTEGER DEFAULT 0,
+                    notes TEXT
+                )
+            """))
+    else:
+        Base.metadata.create_all(bind=engine)
+        _migrate()
 
 
 def _migrate() -> None:
-    """Incremental schema migrations for existing databases."""
+    """Incremental schema migrations for existing databases (SQLite only)."""
     insp = inspect(engine)
     if "employees" in insp.get_table_names():
         existing_cols = {c["name"] for c in insp.get_columns("employees")}
