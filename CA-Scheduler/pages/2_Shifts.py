@@ -181,6 +181,122 @@ def _edit_confirm_dialog():
             st.rerun()
 
 
+def _save_shift_edit(shift_id: int, employee_id: int, shift_date, start, end, break_min: int, notes: str) -> None:
+    db = get_db()
+    try:
+        obj = db.query(Shift).filter(Shift.id == shift_id).first()
+        obj.employee_id  = employee_id
+        obj.date         = shift_date
+        obj.start_time   = start
+        obj.end_time     = end
+        obj.break_minutes = break_min
+        obj.notes        = notes
+        db.commit()
+    finally:
+        db.close()
+
+
+@st.dialog("✏️ 編輯 / 🗑️ 刪除班次")
+def _shift_click_dialog(shift_id: int) -> None:
+    db = get_db()
+    try:
+        sel = db.query(Shift).filter(Shift.id == shift_id).first()
+        if sel is None:
+            st.error("找不到此班次。")
+            if st.button("關閉"):
+                del st.session_state["_editing_shift_id"]
+                st.rerun()
+            return
+        ss_data = {
+            "employee_id":    sel.employee_id,
+            "date":           sel.date,
+            "start_time":     sel.start_time,
+            "end_time":       sel.end_time,
+            "break_minutes":  sel.break_minutes,
+            "notes":          sel.notes or "",
+        }
+    finally:
+        db.close()
+
+    cur_name = emp_map.get(ss_data["employee_id"], employees[0]).name
+    cur_idx  = emp_names.index(cur_name) if cur_name in emp_names else 0
+    warn_key = f"_dlg_warns_{shift_id}"
+
+    tab_ed, tab_dl = st.tabs(["✏️ 編輯", "🗑️ 刪除"])
+
+    with tab_ed:
+        ec1, ec2, ec3 = st.columns(3)
+        ed_emp   = ec1.selectbox("員工", emp_names, index=cur_idx, key=f"dlg_emp_{shift_id}")
+        ed_date  = ec2.date_input("日期", value=ss_data["date"], key=f"dlg_date_{shift_id}")
+        ed_break = ec3.number_input(
+            "休息（分鐘）", min_value=0, max_value=180,
+            value=ss_data["break_minutes"], step=5, key=f"dlg_break_{shift_id}",
+        )
+        et1, et2 = st.columns(2)
+        ed_start = et1.time_input("上班時間", value=ss_data["start_time"], key=f"dlg_start_{shift_id}")
+        ed_end   = et2.time_input("下班時間",  value=ss_data["end_time"],   key=f"dlg_end_{shift_id}")
+        ed_notes = st.text_input("備註", value=ss_data["notes"], key=f"dlg_notes_{shift_id}")
+
+        if st.button("💾 儲存變更", type="primary", key=f"dlg_save_{shift_id}"):
+            hours = calc_hours(ed_start, ed_end, ed_break)
+            if hours <= 0:
+                st.error("❌ 工時計算結果為零，請確認時間設定。")
+            else:
+                db2 = get_db()
+                try:
+                    warns = (
+                        validate_shift(ed_start, ed_end, ed_break)
+                        + shift_conflict_msgs(db2, emp_name_to_id[ed_emp], ed_date,
+                                             ed_start, ed_end, exclude_id=shift_id)
+                        + avail_warn_msgs(emp_map[emp_name_to_id[ed_emp]],
+                                          ed_date, ed_start, ed_end)
+                    )
+                finally:
+                    db2.close()
+                if warns:
+                    st.session_state[warn_key] = {
+                        "warns": warns, "hours": hours,
+                        "employee_id": emp_name_to_id[ed_emp],
+                        "date": ed_date, "start": ed_start,
+                        "end": ed_end, "break": ed_break, "notes": ed_notes,
+                    }
+                else:
+                    _save_shift_edit(shift_id, emp_name_to_id[ed_emp], ed_date,
+                                     ed_start, ed_end, ed_break, ed_notes)
+                    del st.session_state["_editing_shift_id"]
+                    st.rerun()
+
+        if warn_key in st.session_state:
+            pw = st.session_state[warn_key]
+            st.markdown("---")
+            for w in pw["warns"]:
+                st.warning(w)
+            wc1, wc2 = st.columns(2)
+            if wc1.button("✅ 確認儲存", type="primary", key=f"dlg_confirm_{shift_id}"):
+                _save_shift_edit(shift_id, pw["employee_id"], pw["date"],
+                                 pw["start"], pw["end"], pw["break"], pw["notes"])
+                st.session_state.pop(warn_key, None)
+                del st.session_state["_editing_shift_id"]
+                st.rerun()
+            if wc2.button("✖ 取消", key=f"dlg_cancel_save_{shift_id}"):
+                st.session_state.pop(warn_key, None)
+                st.rerun()
+
+    with tab_dl:
+        st.warning(f"即將刪除班次 **#{shift_id}**，此操作無法復原。")
+        confirm_del = st.checkbox("確認刪除此班次", key=f"dlg_confirm_del_{shift_id}")
+        if st.button("🗑️ 確認刪除班次", type="primary",
+                     disabled=not confirm_del, key=f"dlg_del_{shift_id}"):
+            db3 = get_db()
+            try:
+                db3.query(Shift).filter(Shift.id == shift_id).delete()
+                db3.commit()
+            finally:
+                db3.close()
+            del st.session_state["_editing_shift_id"]
+            st.rerun()
+
+
 st.title("📆 班次排程")
 
 st.markdown("---")
@@ -245,33 +361,44 @@ try:
 finally:
     db.close()
 
-# Build calendar matrix: index = employee name, columns = day headers
-cal: dict[str, dict[str, str]] = {name: {h: "" for h in col_headers} for name in emp_names}
-
+# Build shift-cell mapping: (emp_id, day_idx) -> [Shift, ...]
+shift_cell: dict = {}
 for shift in shifts_this_week:
-    emp = emp_map.get(shift.employee_id)
-    if emp is None:
-        continue
     for i, d in enumerate(days):
         if d == shift.date:
-            col_key = col_headers[i]
-            hours = calc_hours(shift.start_time, shift.end_time, shift.break_minutes)
-            cell = (
-                f"{shift.start_time.strftime('%H:%M')}–"
-                f"{shift.end_time.strftime('%H:%M')} ({hours:.1f}h)"
-            )
-            # Mark out-of-availability shifts with a warning icon
-            if avail_conflict(emp, shift.date, shift.start_time, shift.end_time):
-                cell = "🔔 " + cell
-            existing = cal[emp.name][col_key]
-            cal[emp.name][col_key] = (existing + "\n" + cell) if existing else cell
+            shift_cell.setdefault((shift.employee_id, i), []).append(shift)
             break
 
-cal_df = pd.DataFrame(cal).T  # employees as rows
-cal_df.index.name = "員工"
-cal_df.columns = col_headers
-cal_df = cal_df.replace("", "—")
-st.dataframe(cal_df, use_container_width=True)
+# Render clickable calendar grid
+_GCOLS = [1.4] + [1.3] * 7
+_hdr = st.columns(_GCOLS)
+_hdr[0].markdown("**員工**")
+for _i in range(7):
+    _hdr[_i + 1].markdown(f"**{day_labels[_i]}**  \n{days[_i].strftime('%m/%d')}")
+st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
+
+for _emp in employees:
+    _row = st.columns(_GCOLS)
+    _row[0].markdown(f"**{_emp.name}**")
+    for _i in range(7):
+        _cell_shifts = shift_cell.get((_emp.id, _i), [])
+        if not _cell_shifts:
+            _row[_i + 1].markdown("—")
+        else:
+            for _sh in _cell_shifts:
+                _hrs = calc_hours(_sh.start_time, _sh.end_time, _sh.break_minutes)
+                _lbl = f"{_sh.start_time.strftime('%H:%M')}–{_sh.end_time.strftime('%H:%M')}"
+                if avail_conflict(_emp, _sh.date, _sh.start_time, _sh.end_time):
+                    _lbl = "🔔 " + _lbl
+                if _row[_i + 1].button(_lbl, key=f"shift_btn_{_sh.id}",
+                                       help=f"{_hrs:.1f}h  ·  點擊編輯/刪除"):
+                    st.session_state["_editing_shift_id"] = _sh.id
+                    st.rerun()
+    st.markdown("<hr style='margin:2px 0'>", unsafe_allow_html=True)
+
+# Open edit/delete dialog when a shift cell was clicked
+if "_editing_shift_id" in st.session_state:
+    _shift_click_dialog(st.session_state["_editing_shift_id"])
 
 # ── Weekly hours summary ──────────────────────────────────────────────────────
 st.markdown("### 📊 本週工時總覽")

@@ -25,8 +25,17 @@ init_db()
 DAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+DEPT_OPTIONS = ["", "管理", "行政", "前台", "後廚"]
+DEPT_POSITIONS: dict = {
+    "": [],
+    "管理": ["店長", "區經理", "其他"],
+    "行政": ["行政"],
+    "前台": ["前台"],
+    "後廚": ["Precook", "Cook", "Dishwasher"],
+}
+
 TIME_SLOTS: list[str] = [
-    f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)
+    f"{h:02d}:{m:02d}" for h in range(9, 24) for m in (0, 30)
 ]
 
 
@@ -230,9 +239,12 @@ with tab_add:
     with ac1:
         add_name = st.text_input("姓名 *", key="add_name")
     with ac2:
-        add_dept = st.text_input("部門", key="add_dept")
+        add_dept = st.selectbox("部門", options=DEPT_OPTIONS, key="add_dept")
     with ac3:
-        add_position = st.text_input("職位", key="add_position")
+        add_pos_opts = DEPT_POSITIONS.get(add_dept, [])
+        if st.session_state.get("add_position") not in add_pos_opts:
+            st.session_state["add_position"] = add_pos_opts[0] if add_pos_opts else ""
+        add_position = st.selectbox("職位", options=add_pos_opts, key="add_position", disabled=not add_pos_opts)
     with ac4:
         add_rate = st.number_input(
             "時薪（美元）*",
@@ -320,9 +332,12 @@ with tab_edit:
 
     # ── Sync form fields when selected employee changes ─────────────────────
     if st.session_state.get("_edit_last_id") != selected_id:
+        safe_dept = snap["department"] if snap["department"] in DEPT_OPTIONS else ""
+        safe_pos_opts = DEPT_POSITIONS.get(safe_dept, [])
+        safe_pos = snap["position"] if snap["position"] in safe_pos_opts else (safe_pos_opts[0] if safe_pos_opts else "")
         st.session_state["ed_name"]         = snap["name"]
-        st.session_state["ed_dept"]         = snap["department"]
-        st.session_state["ed_pos"]          = snap["position"]
+        st.session_state["ed_dept"]         = safe_dept
+        st.session_state["ed_pos"]          = safe_pos
         st.session_state["ed_rate"]         = snap["hourly_rate"]
         st.session_state["ed_target_hours"] = snap["target_hours"]
         st.session_state["_edit_last_id"]   = selected_id
@@ -334,9 +349,12 @@ with tab_edit:
         with ec1:
             ed_name = st.text_input("姓名", key="ed_name")
         with ec2:
-            ed_dept = st.text_input("部門", key="ed_dept")
+            ed_dept = st.selectbox("部門", options=DEPT_OPTIONS, key="ed_dept")
         with ec3:
-            ed_pos = st.text_input("職位", key="ed_pos")
+            ed_pos_opts = DEPT_POSITIONS.get(ed_dept, [])
+            if st.session_state.get("ed_pos") not in ed_pos_opts:
+                st.session_state["ed_pos"] = ed_pos_opts[0] if ed_pos_opts else ""
+            ed_pos = st.selectbox("職位", options=ed_pos_opts, key="ed_pos", disabled=not ed_pos_opts)
         with ec4:
             ed_rate = st.number_input(
                 "時薪",
