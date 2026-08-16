@@ -115,6 +115,72 @@ def shift_conflict_msgs(db_session, employee_id: int, shift_date: date,
             )
     return msgs
 
+
+# ── Confirmation dialogs ─────────────────────────────────────────────────────
+
+@st.dialog("⚠️ 新增班次確認")
+def _add_confirm_dialog():
+    pa = st.session_state["pending_add"]
+    st.markdown("以下警告需確認後才能新增班次：")
+    for w in pa["warns"]:
+        st.warning(w)
+    st.markdown("---")
+    dc1, dc2 = st.columns(2)
+    with dc1:
+        if st.button("✅ 確認新增", type="primary", use_container_width=True):
+            db = get_db()
+            try:
+                db.add(Shift(
+                    employee_id=pa["employee_id"],
+                    date=pa["date"],
+                    start_time=pa["start_time"],
+                    end_time=pa["end_time"],
+                    break_minutes=pa["break_minutes"],
+                    notes=pa["notes"],
+                ))
+                db.commit()
+            finally:
+                db.close()
+            del st.session_state["pending_add"]
+            st.session_state["_add_success"] = pa["hours"]
+            st.rerun()
+    with dc2:
+        if st.button("✖ 取消", use_container_width=True):
+            del st.session_state["pending_add"]
+            st.rerun()
+
+
+@st.dialog("⚠️ 儲存班次確認")
+def _edit_confirm_dialog():
+    pe = st.session_state["pending_edit"]
+    st.markdown("以下警告需確認後才能儲存班次：")
+    for w in pe["warns"]:
+        st.warning(w)
+    st.markdown("---")
+    dc1, dc2 = st.columns(2)
+    with dc1:
+        if st.button("✅ 確認儲存", type="primary", use_container_width=True):
+            db = get_db()
+            try:
+                shift_obj = db.query(Shift).filter(Shift.id == pe["shift_id"]).first()
+                shift_obj.employee_id = pe["employee_id"]
+                shift_obj.date = pe["date"]
+                shift_obj.start_time = pe["start_time"]
+                shift_obj.end_time = pe["end_time"]
+                shift_obj.break_minutes = pe["break_minutes"]
+                shift_obj.notes = pe["notes"]
+                db.commit()
+            finally:
+                db.close()
+            del st.session_state["pending_edit"]
+            st.session_state["_edit_success"] = pe["hours"]
+            st.rerun()
+    with dc2:
+        if st.button("✖ 取消", use_container_width=True):
+            del st.session_state["pending_edit"]
+            st.rerun()
+
+
 st.title("📆 班次排程")
 
 st.markdown("---")
@@ -440,21 +506,41 @@ with st.expander("➕ 新增班次（單日）", expanded=False):
                 warns += avail_warn_msgs(
                     emp_map[emp_name_to_id[add_emp]], add_date, add_start, add_end
                 )
-                db.add(Shift(
-                    employee_id=emp_name_to_id[add_emp],
-                    date=add_date,
-                    start_time=add_start,
-                    end_time=add_end,
-                    break_minutes=add_break,
-                    notes=add_notes,
-                ))
-                db.commit()
-                st.success(f"✅ 班次已新增！工時：{hours:.2f} 小時")
             finally:
                 db.close()
-            for w in warns:
-                st.warning(w)
-            st.rerun()
+            if warns:
+                st.session_state["pending_add"] = {
+                    "employee_id": emp_name_to_id[add_emp],
+                    "date": add_date,
+                    "start_time": add_start,
+                    "end_time": add_end,
+                    "break_minutes": add_break,
+                    "notes": add_notes,
+                    "hours": hours,
+                    "warns": warns,
+                }
+            else:
+                db = get_db()
+                try:
+                    db.add(Shift(
+                        employee_id=emp_name_to_id[add_emp],
+                        date=add_date,
+                        start_time=add_start,
+                        end_time=add_end,
+                        break_minutes=add_break,
+                        notes=add_notes,
+                    ))
+                    db.commit()
+                finally:
+                    db.close()
+                st.success(f"✅ 班次已新增！工時：{hours:.2f} 小時")
+                st.rerun()
+
+    if "pending_add" in st.session_state:
+        _add_confirm_dialog()
+
+    if "_add_success" in st.session_state:
+        st.success(f"✅ 班次已新增！工時：{st.session_state.pop('_add_success'):.2f} 小時")
 
 st.markdown("---")
 
@@ -543,20 +629,41 @@ with col_ed:
                 warns += avail_warn_msgs(
                     emp_map[emp_name_to_id[ed_emp]], ed_date, ed_start, ed_end
                 )
-                shift_obj = db.query(Shift).filter(Shift.id == sel_shift_id).first()
-                shift_obj.employee_id = emp_name_to_id[ed_emp]
-                shift_obj.date = ed_date
-                shift_obj.start_time = ed_start
-                shift_obj.end_time = ed_end
-                shift_obj.break_minutes = ed_break
-                shift_obj.notes = ed_notes
-                db.commit()
-                st.success(f"✅ 班次已更新！工時：{hours:.2f} 小時")
             finally:
                 db.close()
-            for w in warns:
-                st.warning(w)
-            st.rerun()
+            if warns:
+                st.session_state["pending_edit"] = {
+                    "shift_id": sel_shift_id,
+                    "employee_id": emp_name_to_id[ed_emp],
+                    "date": ed_date,
+                    "start_time": ed_start,
+                    "end_time": ed_end,
+                    "break_minutes": ed_break,
+                    "notes": ed_notes,
+                    "hours": hours,
+                    "warns": warns,
+                }
+            else:
+                db = get_db()
+                try:
+                    shift_obj = db.query(Shift).filter(Shift.id == sel_shift_id).first()
+                    shift_obj.employee_id = emp_name_to_id[ed_emp]
+                    shift_obj.date = ed_date
+                    shift_obj.start_time = ed_start
+                    shift_obj.end_time = ed_end
+                    shift_obj.break_minutes = ed_break
+                    shift_obj.notes = ed_notes
+                    db.commit()
+                finally:
+                    db.close()
+                st.success(f"✅ 班次已更新！工時：{hours:.2f} 小時")
+                st.rerun()
+
+if "pending_edit" in st.session_state:
+    _edit_confirm_dialog()
+
+if "_edit_success" in st.session_state:
+    st.success(f"✅ 班次已更新！工時：{st.session_state.pop('_edit_success'):.2f} 小時")
 
 with col_dl:
     st.markdown("**🗑️ 刪除班次**")
