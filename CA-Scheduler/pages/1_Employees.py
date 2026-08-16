@@ -187,6 +187,7 @@ with tab_list:
                 {
                     "ID": e.id,
                     "姓名": e.name,
+                    "部門": e.department or "—",
                     "職位": e.position or "—",
                     "時薪（美元）": f"${e.hourly_rate:.2f}",
                     "目標週工時": f"{e.target_hours:.1f} h",
@@ -225,12 +226,14 @@ with tab_list:
 with tab_add:
     st.subheader("新增員工")
 
-    ac1, ac2, ac3, ac4 = st.columns(4)
+    ac1, ac2, ac3, ac4, ac5 = st.columns(5)
     with ac1:
         add_name = st.text_input("姓名 *", key="add_name")
     with ac2:
-        add_position = st.text_input("職位", key="add_position")
+        add_dept = st.text_input("部門", key="add_dept")
     with ac3:
+        add_position = st.text_input("職位", key="add_position")
+    with ac4:
         add_rate = st.number_input(
             "時薪（美元）*",
             min_value=0.01,
@@ -239,7 +242,7 @@ with tab_add:
             format="%.2f",
             key="add_rate",
         )
-    with ac4:
+    with ac5:
         add_target_hours = st.number_input(
             "目標週工時（小時）",
             min_value=1.0,
@@ -263,6 +266,7 @@ with tab_add:
             try:
                 emp = Employee(
                     name=add_name.strip(),
+                    department=add_dept.strip(),
                     position=add_position.strip(),
                     hourly_rate=add_rate,
                     target_hours=add_target_hours,
@@ -302,6 +306,7 @@ with tab_edit:
         sel_emp = db.query(Employee).filter(Employee.id == selected_id).first()
         snap = {
             "name": sel_emp.name,
+            "department": sel_emp.department or "",
             "position": sel_emp.position or "",
             "hourly_rate": float(sel_emp.hourly_rate),
             "target_hours": float(sel_emp.target_hours) if sel_emp.target_hours is not None else 40.0,
@@ -316,6 +321,7 @@ with tab_edit:
     # ── Sync form fields when selected employee changes ─────────────────────
     if st.session_state.get("_edit_last_id") != selected_id:
         st.session_state["ed_name"]         = snap["name"]
+        st.session_state["ed_dept"]         = snap["department"]
         st.session_state["ed_pos"]          = snap["position"]
         st.session_state["ed_rate"]         = snap["hourly_rate"]
         st.session_state["ed_target_hours"] = snap["target_hours"]
@@ -324,12 +330,14 @@ with tab_edit:
     # ── Edit panel ─────────────────────────────────────────────────────────
     with col_ed:
         st.markdown("### ✏️ 編輯員工資料")
-        ec1, ec2, ec3, ec4 = st.columns(4)
+        ec1, ec2, ec3, ec4, ec5 = st.columns(5)
         with ec1:
             ed_name = st.text_input("姓名", key="ed_name")
         with ec2:
-            ed_pos = st.text_input("職位", key="ed_pos")
+            ed_dept = st.text_input("部門", key="ed_dept")
         with ec3:
+            ed_pos = st.text_input("職位", key="ed_pos")
+        with ec4:
             ed_rate = st.number_input(
                 "時薪",
                 min_value=0.01,
@@ -337,7 +345,7 @@ with tab_edit:
                 format="%.2f",
                 key="ed_rate",
             )
-        with ec4:
+        with ec5:
             ed_target_hours = st.number_input(
                 "目標週工時（小時）",
                 min_value=1.0,
@@ -362,6 +370,7 @@ with tab_edit:
                 try:
                     emp_obj = db.query(Employee).filter(Employee.id == selected_id).first()
                     emp_obj.name = ed_name.strip()
+                    emp_obj.department = ed_dept.strip()
                     emp_obj.position = ed_pos.strip()
                     emp_obj.hourly_rate = ed_rate
                     emp_obj.target_hours = ed_target_hours

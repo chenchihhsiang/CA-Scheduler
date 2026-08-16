@@ -54,6 +54,7 @@ def init_db() -> None:
                 CREATE TABLE IF NOT EXISTS employees (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
+                    department TEXT DEFAULT '',
                     position TEXT,
                     hourly_rate REAL NOT NULL DEFAULT 16.0,
                     target_hours REAL DEFAULT 40.0,
@@ -89,6 +90,10 @@ def _migrate() -> None:
             if "target_hours" not in existing_cols:
                 conn.execute(
                     text("ALTER TABLE employees ADD COLUMN target_hours REAL DEFAULT 40.0")
+                )
+            if "department" not in existing_cols:
+                conn.execute(
+                    text("ALTER TABLE employees ADD COLUMN department TEXT DEFAULT ''")
                 )
 
 

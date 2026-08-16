@@ -10,6 +10,7 @@ class Employee(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
+    department = Column(String(100), default="")
     position = Column(String(100), default="")
     hourly_rate = Column(Float, nullable=False, default=16.0)
     target_hours = Column(Float, nullable=False, default=40.0)
