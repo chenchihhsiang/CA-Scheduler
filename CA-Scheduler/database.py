@@ -72,6 +72,16 @@ def init_db() -> None:
                     notes TEXT
                 )
             """))
+            # ── Column migrations (idempotent via try/except) ──────────────
+            for stmt in [
+                "ALTER TABLE employees ADD COLUMN availability TEXT DEFAULT '{}'",
+                "ALTER TABLE employees ADD COLUMN target_hours REAL DEFAULT 40.0",
+                "ALTER TABLE employees ADD COLUMN department TEXT DEFAULT ''",
+            ]:
+                try:
+                    conn.execute(text(stmt))
+                except Exception:
+                    pass  # column already exists
     else:
         Base.metadata.create_all(bind=engine)
         _migrate()
