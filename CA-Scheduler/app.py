@@ -1,6 +1,8 @@
 """
 app.py – Main entry point for the CA Scheduler Streamlit application.
 Run with:  streamlit run app.py
+
+Link to Streamlit documentation: https://ca-scheduler-7q5hhzcqhdka9htmvkwbu9.streamlit.app/
 """
 
 import os
