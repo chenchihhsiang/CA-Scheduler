@@ -25,7 +25,7 @@ _DAY_LABELS = ["週一", "週二", "週三", "週四", "週五", "週六", "週�
 
 def avail_conflict(emp: Employee, shift_date: date, start: time, end: time):
     """
-    Return the list of 30-min slots that the shift covers but are NOT in the
+    Return the list of 15-min slots that the shift covers but are NOT in the
     employee's availability for that weekday.
     Returns [] if availability is unconfigured or there is no conflict.
     """
@@ -35,13 +35,15 @@ def avail_conflict(emp: Employee, shift_date: date, start: time, end: time):
         avail = json.loads(emp.availability)
     except (json.JSONDecodeError, TypeError):
         return []
-    if not any(avail.values()):          # all days empty = feature not used
-        return []
 
     day_key = _DAY_KEYS[shift_date.weekday()]
     available = set(avail.get(day_key, []))
+    
+    # If employee has availability configured but this day has no slots, mark as conflict
+    if any(avail.values()) and not available:
+        return ["entire_day_unavailable"]
 
-    # Generate 30-min slots covered by the shift [start, end)
+    # Generate 15-min slots covered by the shift [start, end)
     base = date.today()
     cur  = _dt.combine(base, start)
     stop = _dt.combine(base, end)
@@ -53,7 +55,7 @@ def avail_conflict(emp: Employee, shift_date: date, start: time, end: time):
         slot = cur.strftime("%H:%M")
         if slot not in available:
             missing.append(slot)
-        cur += timedelta(minutes=30)
+        cur += timedelta(minutes=15)
     return missing
 
 
@@ -68,7 +70,7 @@ def avail_warn_msgs(emp: Employee, shift_date: date, start: time, end: time):
     for slot in missing[1:]:
         h0, m0 = map(int, grp[-1].split(":"))
         h1, m1 = map(int, slot.split(":"))
-        if (h1 * 60 + m1) - (h0 * 60 + m0) == 30:
+        if (h1 * 60 + m1) - (h0 * 60 + m0) == 15:
             grp.append(slot)
         else:
             ranges.append(f"{grp[0]}–{grp[-1]}" if len(grp) > 1 else grp[0])

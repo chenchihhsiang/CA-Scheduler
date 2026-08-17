@@ -102,7 +102,7 @@ def is_available_for_window(emp: Employee, day_key: str, start_s: str, end_s: st
     while cur < stop:
         if cur.strftime("%H:%M") not in day_slots:
             return False
-        cur += timedelta(minutes=30)
+        cur += timedelta(minutes=15)
     return True
 
 
@@ -381,7 +381,7 @@ for i, day_key in enumerate(_DAY_KEYS):
             "Cook": tpl["Cook"],
             "Precook": tpl["Precook"],
             "Dishwasher": tpl["Dishwasher"],
-            "班次開始": "11:00",
+            "班次開始": "10:00",
             "班次結束": "22:00",
             "休息(分)": 30,
         }

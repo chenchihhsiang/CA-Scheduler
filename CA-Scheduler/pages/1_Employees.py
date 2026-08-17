@@ -20,6 +20,42 @@ st.set_page_config(page_title="員工管理", page_icon="👥", layout="wide")
 
 init_db()
 
+# ── Dialog for save success ────────────────────────────────────────────────
+
+@st.dialog("✅ 儲存成功")
+def show_save_success():
+    st.balloons()
+    st.markdown("### 員工資料已成功變更！")
+    if st.button("關閉", use_container_width=True):
+        st.rerun()
+
+@st.dialog("🎉 歡迎新員工加入")
+def show_welcome_new_employee(emp_name: str):
+    st.balloons()
+    st.markdown(f"### 🎊 歡迎 **{emp_name}** 加入！")
+    if st.button("返回", use_container_width=True):
+        st.session_state.pop("add_df_state", None)
+        st.rerun()
+
+@st.dialog("🗑️ 確認刪除")
+def show_confirm_delete(emp_name: str, emp_id: int):
+    st.error(f"⚠️ 即將永久刪除員工：**{emp_name}**", icon="⚠️")
+    st.markdown("此操作會同時刪除該員工的所有班次記錄，且無法復原。")
+    col1, col2 = st.columns(2)
+    if col1.button("❌ 取消", use_container_width=True):
+        st.rerun()
+    if col2.button("🗑️ 確認刪除", type="primary", use_container_width=True):
+        db = get_db()
+        try:
+            db.query(Shift).filter(Shift.employee_id == emp_id).delete()
+            db.query(Employee).filter(Employee.id == emp_id).delete()
+            db.commit()
+            st.success(f"✅ 員工「{emp_name}」及其班次已刪除！")
+        finally:
+            db.close()
+        st.session_state.pop("confirm_del", None)
+        st.rerun()
+
 # ── Availability helpers ──────────────────────────────────────────────────────
 
 DAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
@@ -35,7 +71,7 @@ DEPT_POSITIONS: dict = {
 }
 
 TIME_SLOTS: list[str] = [
-    f"{h:02d}:{m:02d}" for h in range(9, 24) for m in (0, 30)
+    f"{h:02d}:{m:02d}" for h in range(10, 24) for m in (0, 15, 30, 45)
 ]
 
 
@@ -76,49 +112,21 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
     if state_key not in st.session_state:
         st.session_state[state_key] = avail_json_to_df(initial_json)
 
-    # ── Section header ──────────────────────────────────────────────────────
-    st.markdown(
-        "**📅 可排班時間**  \n"
-        "<small>勾選員工可接受排班的時間段（每格 30 分鐘）</small>",
-        unsafe_allow_html=True,
-    )
-
-    # ── Global quick-select ─────────────────────────────────────────────────
-    qc1, qc2, qc3 = st.columns(3)
-    if qc1.button("✅ 全選", key=f"{key}_all"):
-        df = pd.DataFrame(True, index=TIME_SLOTS, columns=DAYS)
-        df.index.name = "時間"
-        st.session_state[state_key] = df
-        st.rerun()
-    if qc2.button("❌ 全清", key=f"{key}_clear"):
-        df = pd.DataFrame(False, index=TIME_SLOTS, columns=DAYS)
-        df.index.name = "時間"
-        st.session_state[state_key] = df
-        st.rerun()
-    if qc3.button("🗓 僅平日（週一～週五）", key=f"{key}_weekday"):
-        df = pd.DataFrame(False, index=TIME_SLOTS, columns=DAYS)
-        df.index.name = "時間"
-        for day in ["週一", "週二", "週三", "週四", "週五"]:
-            df[day] = True
-        st.session_state[state_key] = df
-        st.rerun()
-
     # ── Business hours quick-apply ──────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("**🏢 一鍵套用營業時間**")
+    st.markdown("**🏢 一鍵套用可排班時間**")
 
     bh1, bh2 = st.columns(2)
     biz_start = bh1.time_input(
-        "營業開始時間", value=dt_time(11, 0), key=f"{key}_biz_start"
+        "可排班開始時間", value=dt_time(11, 0), key=f"{key}_biz_start"
     )
     biz_end = bh2.time_input(
-        "營業結束時間", value=dt_time(21, 0), key=f"{key}_biz_end"
+        "可排班結束時間", value=dt_time(22, 0), key=f"{key}_biz_end"
     )
 
     # Slots that fall within [biz_start, biz_end)
     biz_slots = [
         t for t in TIME_SLOTS
-        if biz_start <= dt_time(int(t[:2]), int(t[3:])) < biz_end
+        if biz_start <= dt_time(int(t[:2]), int(t[3:])) <= biz_end
     ]
 
     st.caption(
@@ -140,7 +148,7 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
             st.session_state[state_key] = df
             st.rerun()
 
-    app1, app2 = st.columns(2)
+    app1, app2, app3 = st.columns(3)
     if app1.button("🗓 套用至所有平日（週一～週五）", key=f"{key}_biz_weekdays"):
         df = st.session_state[state_key].copy()
         for dl in ["週一", "週二", "週三", "週四", "週五"]:
@@ -157,6 +165,11 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
                 df.at[slot, dl] = True
         st.session_state[state_key] = df
         st.rerun()
+    if app3.button("❌ 全清", key=f"{key}_clear"):
+        df = pd.DataFrame(False, index=TIME_SLOTS, columns=DAYS)
+        df.index.name = "時間"
+        st.session_state[state_key] = df
+        st.rerun()
 
     # ── Timetable ───────────────────────────────────────────────────────────
     st.markdown("---")
@@ -166,6 +179,7 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
         column_config=col_cfg,
         use_container_width=True,
         height=520,
+        key=f"{key}_timetable",
     )
     # Persist manual edits back to session state for next rerun
     st.session_state[state_key] = edited
@@ -286,13 +300,9 @@ with tab_add:
                 )
                 db.add(emp)
                 db.commit()
-                st.success(f"✅ 員工「{add_name.strip()}」已新增！")
-                st.balloons()
+                show_welcome_new_employee(add_name.strip())
             finally:
                 db.close()
-            # Reset timetable state so next add starts blank
-            st.session_state.pop("add_df_state", None)
-            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -394,12 +404,11 @@ with tab_edit:
                     emp_obj.target_hours = ed_target_hours
                     emp_obj.availability = avail_json
                     db.commit()
-                    st.success("✅ 員工資料已更新！")
+                    # Force reload from DB on next visit
+                    st.session_state.pop(f"edit_{selected_id}_df_state", None)
+                    show_save_success()
                 finally:
                     db.close()
-                # Force reload from DB on next visit
-                st.session_state.pop(f"edit_{selected_id}_df_state", None)
-                st.rerun()
 
     # ── Delete panel ───────────────────────────────────────────────────────
     with col_dl:
@@ -410,12 +419,4 @@ with tab_edit:
         )
         confirm_delete = st.checkbox("我確認要刪除此員工及其所有班次", key="confirm_del")
         if st.button("確認刪除", type="primary", disabled=not confirm_delete, key="del_btn"):
-            db = get_db()
-            try:
-                db.query(Shift).filter(Shift.employee_id == selected_id).delete()
-                db.query(Employee).filter(Employee.id == selected_id).delete()
-                db.commit()
-                st.success(f"✅ 員工「{snap['name']}」及其班次已刪除！")
-            finally:
-                db.close()
-            st.rerun()
+            show_confirm_delete(snap['name'], selected_id)
