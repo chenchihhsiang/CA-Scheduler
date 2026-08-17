@@ -293,7 +293,7 @@ with tab_add:
                 emp = Employee(
                     name=add_name.strip(),
                     department=add_dept.strip(),
-                    position=add_position.strip(),
+                    position=(add_position or "").strip(),
                     hourly_rate=add_rate,
                     target_hours=add_target_hours,
                     availability=avail_json,
@@ -399,7 +399,7 @@ with tab_edit:
                     emp_obj = db.query(Employee).filter(Employee.id == selected_id).first()
                     emp_obj.name = ed_name.strip()
                     emp_obj.department = ed_dept.strip()
-                    emp_obj.position = ed_pos.strip()
+                    emp_obj.position = (ed_pos or "").strip()
                     emp_obj.hourly_rate = ed_rate
                     emp_obj.target_hours = ed_target_hours
                     emp_obj.availability = avail_json
