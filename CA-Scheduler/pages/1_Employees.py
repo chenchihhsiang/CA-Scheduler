@@ -116,12 +116,15 @@ def render_avail_editor(key: str, initial_json: Optional[str] = None) -> pd.Data
     st.markdown("**🏢 一鍵套用可排班時間**")
 
     bh1, bh2 = st.columns(2)
-    biz_start = bh1.time_input(
-        "可排班開始時間", value=dt_time(11, 0), key=f"{key}_biz_start"
+    biz_start_str = bh1.selectbox(
+        "可排班開始時間", options=TIME_SLOTS, index=TIME_SLOTS.index("11:00") if "11:00" in TIME_SLOTS else 0, key=f"{key}_biz_start"
     )
-    biz_end = bh2.time_input(
-        "可排班結束時間", value=dt_time(22, 0), key=f"{key}_biz_end"
+    biz_end_str = bh2.selectbox(
+        "可排班結束時間", options=TIME_SLOTS, index=TIME_SLOTS.index("22:00") if "22:00" in TIME_SLOTS else len(TIME_SLOTS)-1, key=f"{key}_biz_end"
     )
+    
+    biz_start = dt_time(int(biz_start_str[:2]), int(biz_start_str[3:]))
+    biz_end = dt_time(int(biz_end_str[:2]), int(biz_end_str[3:]))
 
     # Slots that fall within [biz_start, biz_end)
     biz_slots = [
