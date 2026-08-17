@@ -17,10 +17,16 @@ st.set_page_config(page_title="班次排程", page_icon="📆", layout="wide")
 
 init_db()
 
-# ── Availability conflict helper ──────────────────────────────────────────────
+# ── Time slots and day labels ────────────────────────────────────────────────
 
 _DAY_KEYS  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 _DAY_LABELS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
+
+TIME_SLOTS: list[str] = [
+    f"{h:02d}:{m:02d}" for h in range(10, 24) for m in (0, 15, 30, 45)
+]
+
+# ── Availability conflict helper ──────────────────────────────────────────────
 
 
 def avail_conflict(emp: Employee, shift_date: date, start: time, end: time):
@@ -235,8 +241,14 @@ def _shift_click_dialog(shift_id: int) -> None:
             value=ss_data["break_minutes"], step=5, key=f"dlg_break_{shift_id}",
         )
         et1, et2 = st.columns(2)
-        ed_start = et1.time_input("上班時間", value=ss_data["start_time"], key=f"dlg_start_{shift_id}")
-        ed_end   = et2.time_input("下班時間",  value=ss_data["end_time"],   key=f"dlg_end_{shift_id}")
+        start_str = ss_data["start_time"].strftime("%H:%M")
+        end_str = ss_data["end_time"].strftime("%H:%M")
+        ed_start_str = et1.selectbox("上班時間", options=TIME_SLOTS, index=TIME_SLOTS.index(start_str) if start_str in TIME_SLOTS else 0, key=f"dlg_start_{shift_id}")
+        ed_end_str   = et2.selectbox("下班時間",  options=TIME_SLOTS, index=TIME_SLOTS.index(end_str) if end_str in TIME_SLOTS else len(TIME_SLOTS)-1, key=f"dlg_end_{shift_id}")
+        
+        ed_start = time(int(ed_start_str[:2]), int(ed_start_str[3:]))
+        ed_end = time(int(ed_end_str[:2]), int(ed_end_str[3:]))
+        
         ed_notes = st.text_input("備註", value=ss_data["notes"], key=f"dlg_notes_{shift_id}")
 
         if st.button("💾 儲存變更", type="primary", key=f"dlg_save_{shift_id}"):
@@ -554,8 +566,12 @@ with st.expander("📄 批次新增班次（同員工整週）", expanded=False)
             "休息時間（分鐘）", value=30, min_value=0, max_value=180, step=5, key="batch_break"
         )
         bt1, bt2 = st.columns(2)
-        batch_start = bt1.time_input("上班時間 *", value=time(11, 0), key="batch_start")
-        batch_end   = bt2.time_input("下班時間 *", value=time(19, 0), key="batch_end")
+        batch_start_str = bt1.selectbox("上班時間 *", options=TIME_SLOTS, index=TIME_SLOTS.index("11:00") if "11:00" in TIME_SLOTS else 0, key="batch_start")
+        batch_end_str   = bt2.selectbox("下班時間 *", options=TIME_SLOTS, index=TIME_SLOTS.index("19:00") if "19:00" in TIME_SLOTS else len(TIME_SLOTS)-1, key="batch_end")
+        
+        batch_start = time(int(batch_start_str[:2]), int(batch_start_str[3:]))
+        batch_end = time(int(batch_end_str[:2]), int(batch_end_str[3:]))
+        
         batch_notes = st.text_input("備註（套用至所有選取天）", key="batch_notes")
         st.markdown("選擇要排班的天：")
         _bdc = st.columns(7)
@@ -617,9 +633,13 @@ with st.expander("➕ 新增班次（單日）", expanded=False):
             )
         sb1, sb2 = st.columns(2)
         with sb1:
-            add_start = st.time_input("上班時間 *", value=time(9, 0), key="add_start")
+            add_start_str = st.selectbox("上班時間 *", options=TIME_SLOTS, index=0, key="add_start")
         with sb2:
-            add_end = st.time_input("下班時間 *", value=time(17, 0), key="add_end")
+            add_end_str = st.selectbox("下班時間 *", options=TIME_SLOTS, index=len(TIME_SLOTS)-1, key="add_end")
+        
+        add_start = time(int(add_start_str[:2]), int(add_start_str[3:]))
+        add_end = time(int(add_end_str[:2]), int(add_end_str[3:]))
+        
         add_notes = st.text_input("備註", key="add_notes")
         add_submitted = st.form_submit_button("新增班次", type="primary")
 
@@ -737,9 +757,13 @@ with col_ed:
             )
         et1, et2 = st.columns(2)
         with et1:
-            ed_start = st.time_input("上班時間", value=ss["start_time"])
+            start_str = ss["start_time"].strftime("%H:%M")
+            ed_start_str = st.selectbox("上班時間", options=TIME_SLOTS, index=TIME_SLOTS.index(start_str) if start_str in TIME_SLOTS else 0)
+            ed_start = time(int(ed_start_str[:2]), int(ed_start_str[3:]))
         with et2:
-            ed_end = st.time_input("下班時間", value=ss["end_time"])
+            end_str = ss["end_time"].strftime("%H:%M")
+            ed_end_str = st.selectbox("下班時間", options=TIME_SLOTS, index=TIME_SLOTS.index(end_str) if end_str in TIME_SLOTS else len(TIME_SLOTS)-1)
+            ed_end = time(int(ed_end_str[:2]), int(ed_end_str[3:]))
         ed_notes = st.text_input("備註", value=ss["notes"])
         edit_submitted = st.form_submit_button("儲存變更", type="primary")
 
